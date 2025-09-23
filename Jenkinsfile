@@ -3,6 +3,7 @@ pipeline {
     environment {
         IMAGE_NAME = "toufikj/dotnet-hello"
         IMAGE_TAG  = "${BUILD_NUMBER}"
+        CONTAINER_NAME = "dotnet"
     }
     parameters {
         choice(name: 'ENV', choices: ['UAT', 'PROD'], description: 'Choose deployment environment')
@@ -28,19 +29,16 @@ pipeline {
                 }
             }
         }
-        stage('Deploy to EC2') {
+        stage('Deploy on Jenkins Master') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh '''
-                        TARGET_IP=$([ "$ENV" = "UAT" ] && echo $UAT_EC2_IP || echo $PROD_EC2_IP)
-                        ssh -o StrictHostKeyChecking=no ubuntu@$TARGET_IP "
-                          docker pull $IMAGE_NAME:$IMAGE_TAG &&
-                          docker stop dotnet || true &&
-                          docker rm dotnet || true &&
-                          docker run -d --name dotnet -p 80:80 $IMAGE_NAME:$IMAGE_TAG
-                        "
-                    '''
-                }
+                sh '''
+                    echo "Stopping old container (if running)..."
+                    docker stop $CONTAINER_NAME || true
+                    docker rm $CONTAINER_NAME || true
+
+                    echo "Running new container..."
+                    docker run -d --name $CONTAINER_NAME -p 8080:80 $IMAGE_NAME:$IMAGE_TAG
+                '''
             }
         }
     }
