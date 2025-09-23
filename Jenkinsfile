@@ -1,7 +1,8 @@
 pipeline {
     agent any
     environment {
-        IMAGE = "${IMAGE_NAME}:${BUILD_NUMBER}"
+        IMAGE_NAME = "toufikj/dotnet-hello"
+        IMAGE_TAG  = "${BUILD_NUMBER}"
     }
     parameters {
         choice(name: 'ENV', choices: ['UAT', 'PROD'], description: 'Choose deployment environment')
@@ -9,12 +10,12 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: "https://github.com/<your-github-username>/dotnet-hello-world-fork.git"
+                git branch: 'master', url: 'https://github.com/toufikj/dotnet-hello-world.git'
             }
         }
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE .'
+                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
             }
         }
         stage('Push to DockerHub') {
@@ -22,7 +23,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker push $IMAGE
+                        docker push $IMAGE_NAME:$IMAGE_TAG
                     '''
                 }
             }
@@ -31,12 +32,13 @@ pipeline {
             steps {
                 sshagent(['ec2-ssh-key']) {
                     sh '''
-                        if [ "$ENV" = "UAT" ]; then
-                          TARGET=$UAT_EC2_IP
-                        else
-                          TARGET=$PROD_EC2_IP
-                        fi
-                        ssh -o StrictHostKeyChecking=no ubuntu@$TARGET "docker pull $IMAGE && docker stop dotnet || true && docker rm dotnet || true && docker run -d --name dotnet -p 80:80 $IMAGE"
+                        TARGET_IP=$([ "$ENV" = "UAT" ] && echo $UAT_EC2_IP || echo $PROD_EC2_IP)
+                        ssh -o StrictHostKeyChecking=no ubuntu@$TARGET_IP "
+                          docker pull $IMAGE_NAME:$IMAGE_TAG &&
+                          docker stop dotnet || true &&
+                          docker rm dotnet || true &&
+                          docker run -d --name dotnet -p 80:80 $IMAGE_NAME:$IMAGE_TAG
+                        "
                     '''
                 }
             }
