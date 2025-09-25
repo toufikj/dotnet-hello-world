@@ -41,5 +41,26 @@ pipeline {
                 '''
             }
         }
+        stage('Health Check') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh '''
+                        TARGET_IP=$([ "$ENV" = "UAT" ] && echo $UAT_EC2_IP || echo $PROD_EC2_IP)
+                        echo "Checking health on $TARGET_IP:5000/hello ..."
+                        for i in {1..5}; do
+                          if curl -s http://$TARGET_IP:5000/hello | grep -q "Hello"; then
+                            echo "Health check passed!"
+                            exit 0
+                          fi
+                          echo "Waiting for app... attempt $i"
+                          sleep 5
+                        done
+                        echo "Health check failed!"
+                        exit 1
+                    '''
+                }
+            }
+        }
     }
 }
+
