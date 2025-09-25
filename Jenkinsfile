@@ -37,7 +37,7 @@ pipeline {
                     docker rm $CONTAINER_NAME || true
 
                     echo "Running new container..."
-                    docker run -d --name $CONTAINER_NAME -p 8000:80 $IMAGE_NAME:$IMAGE_TAG
+                    docker run -d --name $CONTAINER_NAME -p 5000:5000 $IMAGE_NAME:$IMAGE_TAG
                 '''
             }
         }
